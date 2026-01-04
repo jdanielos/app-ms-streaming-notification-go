@@ -1,0 +1,39 @@
+{
+    "Config": {
+        "Port": "3002",
+        "Protocolo": "http",
+        "Host": "streamingNotifyHub",
+        "Name": "streamingNotifyHub"
+    },
+    "Log": {
+        "FileName": "logs/msg.log",
+        "ConsoleLevel": "debug"
+    },
+    "PV_DB": "VP_PORT",
+    "RequestBodyLimit": "50mb",
+    "RequestParamsLimit": "50mb",
+    "RequestTimeout": "5s",
+    "RequestKeepAlive": "5s",
+    "RequestMaxHeaderBytes": 1048576,
+    "Cors": {
+        "AllowOrigins": [
+            {
+                "Origin": "http://localhost:3000",
+                "AllowCredentials": true
+            },
+            {
+                "Origin": "http://localhost:3001",
+                "AllowCredentials": true
+            }
+        ],
+        "AllowMethods": [
+            "GET",
+            "POST",
+            "PUT",
+            "DELETE"
+        ],
+        "AllowHeaders": [
+            "*"
+        ]
+    }
+}
