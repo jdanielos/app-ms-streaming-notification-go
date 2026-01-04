@@ -27,9 +27,11 @@ type ResponseSystem struct {
 
 // Códigos de error (Equivalente a impl AppError { pub fn code(...) })
 const (
-	ErrCodeAuthInvalidCredentials = 1001
-	ErrCodeEntitiesDataInvalid    = 1002
-	ErrCodeInternalServer         = 5000
+	ErrCodeAuthInvalidCredentials                = 1001
+	ErrCodeEntitiesDataInvalid                   = 1002
+	ErrCodeBadRequestDataSystem                  = 1004
+	ErrCodeInternalServer                        = 5000
+	ErrCodeUnprocessableEntityInvalidDataRequest = 1011
 )
 
 // NewAuthInvalidCredentials imita a Self::AuthInvalidCredentials(String)
@@ -48,5 +50,30 @@ func NewInternalServerError(err error) *AppError {
 		Code:         ErrCodeInternalServer,
 		InternalCode: "INTERNAL_SERVER_ERROR",
 		Status:       http.StatusInternalServerError,
+	}
+}
+
+func NewUnprStatusUnprocessableEntity(err error) *AppError {
+	return &AppError{
+		Message:      "Error interno no se pudo formatear el json del body " + err.Error(),
+		Code:         ErrCodeUnprocessableEntityInvalidDataRequest,
+		InternalCode: "INTERNAL_ENTITY_SERVER",
+		Status:       http.StatusUnprocessableEntity,
+	}
+}
+func NewErrCodeBadRequestDataSystem(err error) *AppError {
+	return &AppError{
+		Message:      "error al procesar la solicitud intente nuevamente " + err.Error(),
+		Code:         ErrCodeBadRequestDataSystem,
+		InternalCode: "ERROR_BAD_REQUEST",
+		Status:       http.StatusUnprocessableEntity,
+	}
+}
+func NewErrCodeEntitiesDataInvalid(err error) *AppError {
+	return &AppError{
+		Message:      "Error de entidades informacion no valida " + err.Error(),
+		Code:         ErrCodeEntitiesDataInvalid,
+		InternalCode: "INTERNAL_ENTITY_SERVER",
+		Status:       http.StatusUnprocessableEntity,
 	}
 }
