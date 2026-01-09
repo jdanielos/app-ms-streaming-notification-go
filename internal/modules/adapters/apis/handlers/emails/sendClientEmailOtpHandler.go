@@ -5,21 +5,22 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/streamingNotifyHub/internal/infrastructure/config"
+
 	"github.com/streamingNotifyHub/internal/modules/core/emails"
 	"github.com/streamingNotifyHub/internal/modules/domains/entities/command"
 )
 
-type SendOtpEmaisHandler struct {
-	Usecase *emails.SendOtpEmaisUseCase
+type SendClientOtpEmaisHandler struct {
+	Usecase *emails.SendClientOtpEmaisUseCase
 }
 
-func NewSendOtpEmaisHandler(usc *emails.SendOtpEmaisUseCase) *SendOtpEmaisHandler {
-	return &SendOtpEmaisHandler{
+func NewSendClientOtpEmaisHandler(usc *emails.SendClientOtpEmaisUseCase) *SendClientOtpEmaisHandler {
+	return &SendClientOtpEmaisHandler{
 		Usecase: usc,
 	}
 }
 
-func (uc *SendOtpEmaisHandler) ExecuteSendEmailsHandlers(c *fiber.Ctx) error {
+func (uc *SendClientOtpEmaisHandler) ExecuteSendClientEmailsHandlers(c *fiber.Ctx) error {
 
 	var data command.SendOtpCommandRequest
 
@@ -28,7 +29,7 @@ func (uc *SendOtpEmaisHandler) ExecuteSendEmailsHandlers(c *fiber.Ctx) error {
 		slog.Warn("error: " + err.Error())
 		return config.NewUnprStatusUnprocessableEntity(err)
 	}
-	response, errRepository := uc.Usecase.ExecuteSendEmailsUseCase(data)
+	response, errRepository := uc.Usecase.ExecuteSendClientEmailsUseCase(data)
 
 	if errRepository != nil {
 		slog.Error("error: " + errRepository.Error())

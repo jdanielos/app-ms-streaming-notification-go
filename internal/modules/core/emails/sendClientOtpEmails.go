@@ -3,38 +3,44 @@ package emails
 import (
 	"bytes"
 	"errors"
+	"fmt"
+	"math/rand"
 	"text/template"
+	"time"
 
 	"github.com/streamingNotifyHub/internal/infrastructure/config"
+	"github.com/streamingNotifyHub/internal/infrastructure/constants"
 	"github.com/streamingNotifyHub/internal/modules/domains/entities/command"
 	"github.com/streamingNotifyHub/internal/modules/domains/entities/email"
 	"github.com/streamingNotifyHub/internal/modules/domains/ports"
 )
 
-type SendOtpEmaisUseCase struct {
+type SendClientOtpEmaisUseCase struct {
 	RepositoryEmails ports.EmailsRepositoryInterface
 }
 
-func NewSendOtpEmaisUseCase(repo ports.EmailsRepositoryInterface) *SendOtpEmaisUseCase {
-	return &SendOtpEmaisUseCase{
+func NewSendClientOtpEmaisUseCase(repo ports.EmailsRepositoryInterface) *SendClientOtpEmaisUseCase {
+	return &SendClientOtpEmaisUseCase{
 		RepositoryEmails: repo,
 	}
 }
 
-func (uc *SendOtpEmaisUseCase) ExecuteSendEmailsUseCase(data command.SendOtpCommandRequest) (email.EntityEmailOtpResponse, error) {
+func (uc *SendClientOtpEmaisUseCase) ExecuteSendClientEmailsUseCase(data command.SendOtpCommandRequest) (email.EntityEmailOtpResponse, error) {
 	_, errValid := email.NewEntityOtp(data)
 
 	if errValid != nil {
-		// Retornamos un error conocido (401 o 422 según prefieras)
 		return email.EntityEmailOtpResponse{}, config.NewErrCodeEntitiesDataInvalid(errors.New(errValid.Error()))
 	}
-	// 1. Datos para el template
+	code := fmt.Sprintf("%06d", rand.Intn(1000000))
+
+	data.Subject = fmt.Sprintf("Tu codigo es: %s", code)
+
 	dataTemplated := map[string]interface{}{
-		"codeOtp":  data.Code,
+		"codeOtp":  code,
 		"timeCode": data.TimeCodeVerification,
 	}
 
-	tmpl, err := template.ParseFiles("internal/modules/application/templates/SendOtpsEmail.html")
+	tmpl, err := template.ParseFiles("internal/modules/core/templates/SendOtpsEmail.html")
 	if err != nil {
 		return email.EntityEmailOtpResponse{}, config.NewInternalServerError(err)
 	}
@@ -51,6 +57,8 @@ func (uc *SendOtpEmaisUseCase) ExecuteSendEmailsUseCase(data command.SendOtpComm
 	if errRepository != nil {
 		return email.EntityEmailOtpResponse{}, config.NewErrCodeBadRequestDataSystem(errRepository)
 	}
+
+	config.SetCache(fmt.Sprintf("%s:%s", constants.REDIS_KEYS[0], data.Email), map[string]string{"code": code}, 5*time.Minute)
 
 	return response, nil
 }
