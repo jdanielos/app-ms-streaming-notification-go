@@ -1,30 +1,35 @@
 package modules
 
 import (
-	"log/slog"
-
 	"github.com/gofiber/fiber/v2" // Asegúrate de usar v2
 	"github.com/streamingNotifyHub/internal/infrastructure/config"
 	"github.com/streamingNotifyHub/internal/infrastructure/constants"
 	"github.com/streamingNotifyHub/internal/infrastructure/types"
 	handlersEmail "github.com/streamingNotifyHub/internal/modules/adapters/apis/handlers/emails"
 	adapters "github.com/streamingNotifyHub/internal/modules/adapters/services/emails"
-	useCaseEmail "github.com/streamingNotifyHub/internal/modules/application/emails"
+	useCaseEmail "github.com/streamingNotifyHub/internal/modules/core/emails"
 	"github.com/streamingNotifyHub/internal/modules/domains/ports"
 	"go.uber.org/fx"
 )
 
 // ConfigureUserRoutes inyecta el Handler y el Store global
-func ConfigureEmailsRoutes(otpEmail *handlersEmail.SendOtpEmaisHandler, store *types.HandlersStore, _ *config.AppSettings) {
+func ConfigureEmailsRoutes(
+	otpEmail *handlersEmail.SendOtpEmaisHandler,
+	otpEmailClient *handlersEmail.SendClientOtpEmaisHandler,
+	store *types.HandlersStore, _ *config.AppSettings) {
 
 	userModule := types.SliceHandlers{
 		Prefix: "",
 		Routes: []types.HandlerModule{
 			{
-				Route:  constants.API_ROUTER_STABLE + "/emailotp",
-				Method: fiber.MethodPost,
-				// En Fiber, pasamos directamente la función del controlador
+				Route:   constants.API_ROUTER_STABLE + "/emailotp",
+				Method:  fiber.MethodPost,
 				Handler: otpEmail.ExecuteSendEmailsHandlers,
+			},
+			{
+				Route:   constants.API_ROUTER_STABLE + "/emailotpRegister",
+				Method:  fiber.MethodPost,
+				Handler: otpEmailClient.ExecuteSendClientEmailsHandlers,
 			},
 		},
 	}
@@ -39,6 +44,7 @@ func ModuleEmailsProvider() []fx.Option {
 
 		// 1. Proveemos el Handler (el controlador)
 		fx.Provide(handlersEmail.NewSendOtpEmaisHandler),
+		fx.Provide(handlersEmail.NewSendClientOtpEmaisHandler),
 
 		// 2. Dominios puertos
 		fx.Provide(adapters.NewServicesEmailAdapter,
@@ -48,32 +54,9 @@ func ModuleEmailsProvider() []fx.Option {
 
 		// fx.Provide(usecases.NewUserUseCase),
 		fx.Provide(useCaseEmail.NewSendOtpEmaisUseCase),
+		fx.Provide(useCaseEmail.NewSendClientOtpEmaisUseCase),
 
 		// 3. Invocamos la configuración de rutas
 		fx.Invoke(ConfigureEmailsRoutes),
 	}
-}
-
-type UserHandler struct {
-	// Aquí puedes inyectar usecases si quieres
-}
-
-func NewUserHandler() *UserHandler {
-	return &UserHandler{}
-}
-
-// LoginHandler es el método que se registra en la ruta
-func (h *UserHandler) LoginHandler(c *fiber.Ctx) error {
-	// Ejemplo de respuesta JSON
-	return c.JSON(fiber.Map{
-		"status": "success",
-		"msg":    "Login de prueba",
-	})
-}
-
-func (h *UserHandler) GetProfileHandler(c *fiber.Ctx) error {
-	slog.Debug("Ok")
-	//user := fiber.Map{"user": "Admin"}
-	return config.NewAuthInvalidCredentials("Perfil obtenido correctamente")
-	//return config.SendOk(c, user, "Perfil obtenido correctamente")
 }
