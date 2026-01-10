@@ -33,11 +33,11 @@ func (a *ServicesEmailAdapter) SendOtpsEmails(data command.SendOtpCommandRequest
 
 	if err != nil {
 		println(err.Error())
-		return email.EntityEmailOtpResponse{}, errors.New(err.Error())
+		return email.EntityEmailOtpResponse{}, errors.New(`en estos momentos nuestros equipo esta trabajando para solucionar el error`)
 	}
 
 	return email.EntityEmailOtpResponse{
-		Message: "Correo enviado exitosamente a " + data.Email,
+		Response: "Correo enviado exitosamente a " + data.Email,
 		Details: struct {
 			ServiceExternal          string "json:\"service_external\""
 			ResponseServicesExternal string "json:\"responses_ervices_external\""
