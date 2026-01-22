@@ -1,15 +1,10 @@
 [build]
-# Esta es la ruta a tu main.go
 cmd = "go build -o ./tmp/main.exe ./cmd/main.go"
 
-# Este es el binario que Air va a ejecutar después de compilar
 bin = "./tmp/main.exe"
 
-# Directorios que Air debe vigilar (añade cmd si no está)
 include_dir = ["cmd", "internal", "pkg"]
 
-# Extensiones que disparan el reinicio
 include_ext = ["go", "tpl", "tmpl", "html", "json"]
 
-# Directorios a ignorar
 exclude_dir = ["assets", "tmp", "vendor", "docs"]
