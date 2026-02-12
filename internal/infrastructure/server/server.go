@@ -79,7 +79,6 @@ func NewFiberServer(lc fx.Lifecycle, h *types.HandlersStore, appsettings *config
 	app.Use(func(c *fiber.Ctx) error {
 		start := time.Now()
 		err := c.Next() // Procesar la ruta
-		slog.Debug("ssss")
 		slog.Info("http_request",
 			slog.String("ip", c.IP()),
 			slog.String("method", c.Method()),

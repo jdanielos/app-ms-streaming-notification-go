@@ -1,13 +1,18 @@
 package modules
 
 import (
+	"log/slog"
+
 	"github.com/gofiber/fiber/v2" // Asegúrate de usar v2
+	"github.com/streamingNotifyHub/internal/infrastructure/brokers"
 	"github.com/streamingNotifyHub/internal/infrastructure/config"
 	"github.com/streamingNotifyHub/internal/infrastructure/constants"
 	"github.com/streamingNotifyHub/internal/infrastructure/types"
+	events "github.com/streamingNotifyHub/internal/modules/adapters/apis/events/rabbitmq"
 	handlersEmail "github.com/streamingNotifyHub/internal/modules/adapters/apis/handlers/emails"
 	adapters "github.com/streamingNotifyHub/internal/modules/adapters/services/emails"
-	useCaseEmail "github.com/streamingNotifyHub/internal/modules/core/emails"
+	coreEmail "github.com/streamingNotifyHub/internal/modules/core/emails"
+	"github.com/streamingNotifyHub/internal/modules/core/notifications"
 	"github.com/streamingNotifyHub/internal/modules/domains/ports"
 	"go.uber.org/fx"
 )
@@ -42,21 +47,34 @@ func ConfigureEmailsRoutes(
 func ModuleEmailsProvider() []fx.Option {
 	return []fx.Option{
 
+		/* === INFRASTRUCTURE ===*/
+		fx.Provide(brokers.NewRabbitMQChannel),
+
 		// 1. Proveemos el Handler (el controlador)
 		fx.Provide(handlersEmail.NewSendOtpEmaisHandler),
 		fx.Provide(handlersEmail.NewSendClientOtpEmaisHandler),
+		fx.Provide(events.NewAuthEventConsumer),
 
 		// 2. Dominios puertos
 		fx.Provide(adapters.NewServicesEmailAdapter,
 			func(adapter *adapters.ServicesEmailAdapter) ports.EmailsRepositoryInterface {
 				return adapter
 			}),
+		fx.Provide(adapters.NewEmailServicesAdapter,
+			func(adapter *adapters.EmailServicesAdapter) ports.EventEmailsInterface {
+				return adapter
+			}),
 
 		// fx.Provide(usecases.NewUserUseCase),
-		fx.Provide(useCaseEmail.NewSendOtpEmaisUseCase),
-		fx.Provide(useCaseEmail.NewSendClientOtpEmaisUseCase),
+		fx.Provide(coreEmail.NewSendOtpEmaisUseCase),
+		fx.Provide(coreEmail.NewSendClientOtpEmaisUseCase),
+		fx.Provide(notifications.NewSendClientOtpEmaisUseCase),
 
 		// 3. Invocamos la configuración de rutas
 		fx.Invoke(ConfigureEmailsRoutes),
+		fx.Invoke(func(consumer *events.AuthEventConsumer) {
+			slog.Info("Activando el consumidor de RabbitMQ...")
+			consumer.StartNofifyServices()
+		}),
 	}
 }
