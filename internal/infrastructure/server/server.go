@@ -102,23 +102,23 @@ func NewFiberServer(lc fx.Lifecycle, h *types.HandlersStore, appsettings *config
 				certPath, _ := filepath.Abs("localhost.pem")
 				keyPath, _ := filepath.Abs("localhost-key.pem")
 
-				slog.Info("Cargando certificados desde", "cert", certPath, "key", keyPath)
+				slog.Info("🗒️_Cargando certificados desde ", "cert", certPath, "key", keyPath)
 
 				// Fíjate en el ".pem" al final de ambos archivos
 				if err := app.ListenTLS(":3002", "localhost.pem", "localhost-key.pem"); err != nil {
-					slog.Error("Error Fiber ListenTLS", "error", err)
+					slog.Error("❌ Error Fiber ListenTLS", "error", err)
 				}
 			}()
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
-			slog.Info("Apagando servidor...")
+			slog.Info("⚠️_Apagando servidor...")
 			logFile.Close()
 			return app.Shutdown()
 		},
 	})
 
-	slog.Info("Listening on server HTTPS/2 -  http://" + appsettings.Config.Host + ":" + appsettings.Config.Port)
+	slog.Info("✅ Listening on server HTTPS/2 -  http://" + appsettings.Config.Host + ":" + appsettings.Config.Port)
 	return app
 }
 

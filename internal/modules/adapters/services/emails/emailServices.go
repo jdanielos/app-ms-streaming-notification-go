@@ -19,6 +19,7 @@ func NewEmailServicesAdapter() *EmailServicesAdapter {
 }
 
 func (a *EmailServicesAdapter) SendOtpsEmail(data *command.AuthenticatedUserCommand, html string) (email.EntityEmailOtpResponse, error) {
+
 	cfg := brevo.NewConfiguration()
 	cfg.AddDefaultHeader("api-key", os.Getenv("CREDENTIALS_EMAIL_PROVIDER"))
 	client := brevo.NewAPIClient(cfg)
