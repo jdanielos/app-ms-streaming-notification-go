@@ -25,11 +25,7 @@ func NewSendClientOtpEmaisUseCase(ports ports.EventEmailsInterface) *Notificatio
 }
 
 func (uc *NotificationServices) SendOtpService(data *command.AuthenticatedUserCommand) (email.EntityEmailOtpResponse, error) {
-
-	println("Recibiendo el primer mensage")
 	code := rand.Intn(1000000)
-
-	//fmt.Sprintf("Tu codigo es: %s", code)
 
 	dataTemplated := map[string]int{
 		"codeOtp":  code,

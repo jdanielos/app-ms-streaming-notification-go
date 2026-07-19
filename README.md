@@ -1,3 +1,6 @@
+> version
+0.1.0
+
 > https://github.com/FiloSottile/mkcert/releases
 > mover archivo dentro del proyecto
 > Rename-Item .\mkcert-v1.4.4-windows-amd64.exe mkcert.exe
