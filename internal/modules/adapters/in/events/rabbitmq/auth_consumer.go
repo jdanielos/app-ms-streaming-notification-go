@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/rabbitmq/amqp091-go"
-	dto "github.com/streamingNotifyHub/internal/modules/adapters/apis/events/Dto"
+	dto "github.com/streamingNotifyHub/internal/modules/adapters/in/events/Dto"
 	"github.com/streamingNotifyHub/internal/modules/core/notifications"
 )
 

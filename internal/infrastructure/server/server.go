@@ -105,7 +105,7 @@ func NewFiberServer(lc fx.Lifecycle, h *types.HandlersStore, appsettings *config
 				slog.Info("🗒️_Cargando certificados desde ", "cert", certPath, "key", keyPath)
 
 				// Fíjate en el ".pem" al final de ambos archivos
-				if err := app.ListenTLS(":3002", "localhost.pem", "localhost-key.pem"); err != nil {
+				if err := app.Listen(":" + os.Getenv("PORT")); err != nil {
 					slog.Error("❌ Error Fiber ListenTLS", "error", err)
 				}
 			}()
