@@ -1,6 +1,7 @@
 package emails
 
 import (
+	"encoding/json"
 	"log/slog"
 
 	"github.com/gofiber/fiber/v2"
@@ -24,8 +25,9 @@ func (uc *SendClientOtpEmaisHandler) ExecuteSendClientEmailsHandlers(c *fiber.Ct
 
 	var data command.SendOtpCommandRequest
 
-	// 1. Recibimos JSON -> Command
-	if err := c.BodyParser(&data); err != nil {
+	// Parseamos el JSON directamente para no depender del Content-Type enviado
+	// por el cliente y conservar un mensaje claro cuando el body sea inválido.
+	if err := json.Unmarshal(c.Body(), &data); err != nil {
 		slog.Warn("error: " + err.Error())
 		return config.NewUnprStatusUnprocessableEntity(err)
 	}
@@ -33,7 +35,7 @@ func (uc *SendClientOtpEmaisHandler) ExecuteSendClientEmailsHandlers(c *fiber.Ct
 
 	if errRepository != nil {
 		slog.Error("error: " + errRepository.Error())
-		return config.NewUnprStatusUnprocessableEntity(errRepository)
+		return errRepository
 	}
 
 	return config.SendOk(c, response, "Opt sucessfull")
