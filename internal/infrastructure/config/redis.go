@@ -31,18 +31,21 @@ func GetRedisClient(addr string, db int) *redis.Client {
 		return c
 	}
 
-	c := redis.NewClient(&redis.Options{
+	options := &redis.Options{
 		Addr:         addr,
 		DB:           db,
 		PoolSize:     200,
-		Password:     os.Getenv("CREDENTIALREDIS"),
 		MinIdleConns: 20,
 		PoolTimeout:  5 * time.Second,
 		IdleTimeout:  5 * time.Minute,
 		ReadTimeout:  2 * time.Second,
 		WriteTimeout: 2 * time.Second,
 		DialTimeout:  3 * time.Second,
-	})
+	}
+	if password := os.Getenv("CREDENTIALREDIS"); password != "" {
+		options.Password = password
+	}
+	c := redis.NewClient(options)
 
 	// Test inicial
 	if err := c.Ping(ctx).Err(); err != nil {

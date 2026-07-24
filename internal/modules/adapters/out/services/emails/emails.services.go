@@ -3,6 +3,7 @@ package adapters
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"os"
 
 	brevo "github.com/getbrevo/brevo-go/lib"
@@ -38,10 +39,18 @@ func (a *ServicesEmailAdapter) SendOtpsEmails(data command.SendOtpCommandRequest
 		HtmlContent: html,
 	}
 
-	result, _, err := client.TransactionalEmailsApi.SendTransacEmail(context.Background(), params)
+	result, brevoResponse, err := client.TransactionalEmailsApi.SendTransacEmail(context.Background(), params)
 
 	if err != nil {
-		println("Error Brevo:", err.Error())
+		statusCode := 0
+		if brevoResponse != nil {
+			statusCode = brevoResponse.StatusCode
+		}
+		slog.Error("brevo email delivery failed",
+			slog.Int("status_code", statusCode),
+			slog.String("error", err.Error()),
+			slog.String("sender", os.Getenv("CREDENTIALS_FROM_EMAIL_PROVIDER")),
+		)
 		return email.EntityEmailOtpResponse{}, errors.New(`en estos momentos nuestro equipo esta trabajando para solucionar el error`)
 	}
 

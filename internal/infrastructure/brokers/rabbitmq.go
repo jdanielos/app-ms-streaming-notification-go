@@ -27,7 +27,13 @@ func NewRabbitMQChannel(lc fx.Lifecycle) (*amqp091.Channel, *string) {
 	}
 
 	// microservicios publican mensages en esta direccion
-	exchangeName := constants.ENV_CHANELRABBITMQ_NOTIFY_TOPIC
+	exchangeName := os.Getenv(constants.ENV_CHANELRABBITMQ_NOTIFY_TOPIC)
+	if exchangeName == "" {
+		slog.Error("Variable de exchange RabbitMQ no configurada", "name", constants.ENV_CHANELRABBITMQ_NOTIFY_TOPIC)
+		ch.Close()
+		conn.Close()
+		return nil, nil
+	}
 	err = ch.ExchangeDeclare(
 		exchangeName,
 		"topic",
@@ -65,6 +71,12 @@ func NewRabbitMQChannel(lc fx.Lifecycle) (*amqp091.Channel, *string) {
 		false,
 		nil,
 	)
+	if err != nil {
+		slog.Error("Error vinculando cola al exchange", "queue", queueName, "exchange", exchangeName, "error", err)
+		ch.Close()
+		conn.Close()
+		return nil, nil
+	}
 
 	ch.Qos(1, 0, false)
 
