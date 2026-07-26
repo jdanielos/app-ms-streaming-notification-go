@@ -3,7 +3,6 @@ package notifications
 import (
 	"bytes"
 	"fmt"
-	"math/rand"
 	"text/template"
 	"time"
 
@@ -25,11 +24,14 @@ func NewSendClientOtpEmaisUseCase(ports ports.EventEmailsInterface) *Notificatio
 }
 
 func (uc *NotificationServices) SendOtpService(data *command.AuthenticatedUserCommand) (email.EntityEmailOtpResponse, error) {
-	code := rand.Intn(1000000)
+	code := data.Code
+	if code == "" {
+		return email.EntityEmailOtpResponse{}, config.NewErrCodeEntitiesDataInvalid(fmt.Errorf("código OTP no configurado"))
+	}
 
-	dataTemplated := map[string]int{
+	dataTemplated := map[string]string{
 		"codeOtp":  code,
-		"timeCode": 5,
+		"timeCode": "5",
 	}
 
 	tmpl, err := template.ParseFiles("internal/modules/core/templates/SendOtpsEmail.html")
@@ -50,7 +52,15 @@ func (uc *NotificationServices) SendOtpService(data *command.AuthenticatedUserCo
 		return email.EntityEmailOtpResponse{}, config.NewErrCodeBadRequestDataSystem(errRepository)
 	}
 
-	config.SetCache(fmt.Sprintf("%s:%s", constants.REDIS_KEYS[0], data.Email), map[string]int{"code": code}, 5*time.Minute)
+	cacheKey := fmt.Sprintf("%s:%s", constants.REDIS_KEYS[0], data.Email)
+	cacheValue := map[string]string{"code": code}
+	if data.TypeTemplated == "login_verification" && data.ChallengeID != "" {
+		cacheKey = fmt.Sprintf("auth:login_email_otp:%s", data.ChallengeID)
+		// Rust deserializa este valor como LoginEmailOtp. No se puede guardar
+		// solamente el codigo porque se perderia el identificador del desafio.
+		cacheValue["challenge_id"] = data.ChallengeID
+	}
+	config.SetCache(cacheKey, cacheValue, 5*time.Minute)
 
 	return response, nil
 }

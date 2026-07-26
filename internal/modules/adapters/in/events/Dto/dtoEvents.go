@@ -9,6 +9,8 @@ type AuthEventDTO struct {
 	TimeCodeVerification string `json:"time_code_verification"`
 	Subject              string `json:"subject"`
 	Metadata             map[string]string
+	TypeTemplated        string `json:"type_templated"`
+	ChallengeID          string `json:"challenge_id"`
 }
 
 func (dto AuthEventDTO) ToCommand() command.AuthenticatedUserCommand {
@@ -19,5 +21,7 @@ func (dto AuthEventDTO) ToCommand() command.AuthenticatedUserCommand {
 		Subject:              dto.Subject,
 		TimeCodeVerification: dto.TimeCodeVerification,
 		Metadata:             dto.Metadata,
+		TypeTemplated:        dto.TypeTemplated,
+		ChallengeID:          dto.ChallengeID,
 	}
 }
