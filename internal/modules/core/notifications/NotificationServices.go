@@ -3,7 +3,6 @@ package notifications
 import (
 	"bytes"
 	"fmt"
-	"math/rand"
 	"text/template"
 	"time"
 
@@ -25,7 +24,10 @@ func NewSendClientOtpEmaisUseCase(ports ports.EventEmailsInterface) *Notificatio
 }
 
 func (uc *NotificationServices) SendOtpService(data *command.AuthenticatedUserCommand) (email.EntityEmailOtpResponse, error) {
-	code := rand.Intn(1000000)
+	code := data.Code
+	if code == "" {
+		return email.EntityEmailOtpResponse{}, config.NewErrCodeEntitiesDataInvalid(fmt.Errorf("código OTP no configurado"))
+	}
 
 	dataTemplated := map[string]int{
 		"codeOtp":  code,
@@ -50,7 +52,11 @@ func (uc *NotificationServices) SendOtpService(data *command.AuthenticatedUserCo
 		return email.EntityEmailOtpResponse{}, config.NewErrCodeBadRequestDataSystem(errRepository)
 	}
 
-	config.SetCache(fmt.Sprintf("%s:%s", constants.REDIS_KEYS[0], data.Email), map[string]int{"code": code}, 5*time.Minute)
+	cacheKey := fmt.Sprintf("%s:%s", constants.REDIS_KEYS[0], data.Email)
+	if data.TypeTemplated == "login_verification" && data.ChallengeID != "" {
+		cacheKey = fmt.Sprintf("auth:login_email_otp:%s", data.ChallengeID)
+	}
+	config.SetCache(cacheKey, map[string]string{"code": code}, 5*time.Minute)
 
 	return response, nil
 }

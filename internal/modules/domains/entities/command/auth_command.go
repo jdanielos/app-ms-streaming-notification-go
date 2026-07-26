@@ -7,4 +7,6 @@ type AuthenticatedUserCommand struct {
 	Subject              string `json:"subject"`
 	TimeCodeVerification string `json:"time_code_verification"`
 	Metadata             map[string]string
+	TypeTemplated        string `json:"type_templated"`
+	ChallengeID          string `json:"challenge_id"`
 }
