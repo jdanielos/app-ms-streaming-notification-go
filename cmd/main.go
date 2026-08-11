@@ -28,6 +28,7 @@ func main() {
 	app := server.ProviderServerStore{}
 	app.Init()
 	app.AddModule(modules.ModuleEmailsProvider())
+	app.AddModule(modules.ModuleNotificationsProvider())
 	app.Up()
 
 }
