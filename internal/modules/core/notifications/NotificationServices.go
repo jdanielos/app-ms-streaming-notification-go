@@ -29,9 +29,11 @@ func (uc *NotificationServices) SendOtpService(data *command.AuthenticatedUserCo
 		return email.EntityEmailOtpResponse{}, config.NewErrCodeEntitiesDataInvalid(fmt.Errorf("código OTP no configurado"))
 	}
 
+	// La plantilla imprime este valor tal cual detrás de "Caduca en": sin la
+	// unidad quedaba "Caduca en 5.".
 	dataTemplated := map[string]string{
 		"codeOtp":  code,
-		"timeCode": "5",
+		"timeCode": "5 minutos",
 	}
 
 	tmpl, err := template.ParseFiles("internal/modules/core/templates/SendOtpsEmail.html")

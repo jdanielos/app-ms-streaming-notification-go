@@ -4,55 +4,149 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="x-apple-disable-message-reformatting" />
-    <title>Código de verificación</title>
+    <!-- Sin esto, los clientes en oscuro invierten los colores por su cuenta y
+         rompen el contraste del bloque del codigo. -->
+    <meta name="color-scheme" content="light dark" />
+    <meta name="supported-color-schemes" content="light dark" />
+    <title>{{ if .title }}{{ .title }}{{ else }}Confirma tu correo electrónico{{ end }}</title>
+    <style>
+      /* Roboto es la fuente de la aplicacion. No se carga desde la red: la
+         mayoria de clientes bloquea las fuentes remotas, y este servicio corre
+         en una red que no siempre tiene salida a internet. Si el equipo la tiene
+         instalada se usa; si no, cae a la del sistema. */
+      body,
+      table,
+      td,
+      p,
+      h1 {
+        font-family: "Roboto", "Segoe UI", -apple-system, BlinkMacSystemFont,
+          "Helvetica Neue", Arial, sans-serif;
+      }
+
+      /* Gmail e Outlook clasico ignoran esta consulta; por eso el diseño en claro
+         tiene que sostenerse solo y el oscuro es una mejora, no un requisito. */
+      @media (prefers-color-scheme: dark) {
+        .page { background-color: #050505 !important; }
+        .card {
+          background-color: #0a0a0b !important;
+          border-color: #232326 !important;
+        }
+        .card-head,
+        .card-foot { border-color: #232326 !important; }
+        .card-foot { background-color: #0f0f11 !important; }
+        .t-primary { color: #ffffff !important; }
+        .t-secondary { color: #d4d4d8 !important; }
+        .t-muted { color: #a1a1aa !important; }
+        .t-subtle { color: #71717a !important; }
+        .code-box {
+          background-color: #0d2b31 !important;
+          border-color: #155e75 !important;
+        }
+        .code, .accent { color: #22d3ee !important; }
+        .pill {
+          background-color: #0d2b31 !important;
+          color: #22d3ee !important;
+        }
+      }
+
+      @media only screen and (max-width: 600px) {
+        .pad-x { padding-left: 24px !important; padding-right: 24px !important; }
+        .code { font-size: 30px !important; letter-spacing: 6px !important; }
+        .h1 { font-size: 24px !important; line-height: 32px !important; }
+      }
+    </style>
   </head>
-  <body style="margin:0;padding:0;background-color:#f3f5f8;font-family:Arial,Helvetica,sans-serif;color:#121a2b;">
+
+  <body class="page" style="margin:0;padding:0;background-color:#f8fafc;color:#0f172a;">
+    <!-- Texto de vista previa: es lo que se lee en la bandeja antes de abrir. -->
     <div style="display:none;max-height:0;overflow:hidden;opacity:0;">
-      Tu código de verificación para Streaming está listo.
+      Tu código de verificación de Streaming. Caduca pronto y no debe compartirse.
     </div>
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f3f5f8;">
+
+    <table role="presentation" class="page" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc;">
       <tr>
-        <td align="center" style="padding:36px 16px;">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background-color:#ffffff;border:1px solid #e3e7ee;border-radius:16px;">
+        <td align="center" style="padding:40px 16px;">
+          <table role="presentation" class="card" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background-color:#ffffff;border:1px solid #e2e8f0;border-radius:20px;">
+
+            <!-- Marca -->
             <tr>
-              <td style="padding:30px 36px 22px;border-bottom:1px solid #edf0f4;">
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <td class="card-head pad-x" style="padding:26px 36px;border-bottom:1px solid #e2e8f0;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                   <tr>
-                    <td style="color:#121a2b;font-size:18px;font-weight:700;letter-spacing:-0.2px;">streaming</td>
+                    <!-- Punto cian: el unico color de marca de la plataforma. Va
+                         como cuadro con radio porque Outlook no dibuja circulos. -->
+                    <td style="width:10px;height:10px;background-color:#0891b2;border-radius:3px;font-size:0;line-height:0;">&nbsp;</td>
+                    <td class="t-primary" style="padding-left:10px;color:#0f172a;font-size:17px;font-weight:700;letter-spacing:-0.2px;">Streaming</td>
                   </tr>
                 </table>
               </td>
             </tr>
+
+            <!-- Cuerpo -->
             <tr>
-              <td style="padding:36px 36px 40px;">
-                <p style="margin:0 0 10px;color:#68758a;font-size:13px;line-height:20px;">Verificación de cuenta</p>
-                <h1 style="margin:0;color:#121a2b;font-size:28px;line-height:36px;font-weight:700;letter-spacing:-0.4px;">Confirma tu correo electrónico</h1>
-                <p style="margin:14px 0 0;color:#56647a;font-size:15px;line-height:23px;">Introduce este código en streaming para completar tu registro.</p>
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0 22px;background-color:#f7f8fa;border:1px solid #e1e6ed;border-radius:12px;">
-                  <tr>
-                    <td align="center" style="padding:22px 12px;">
-                      <p style="margin:0;color:#121a2b;font-size:34px;line-height:40px;font-weight:700;letter-spacing:8px;">{{ .codeOtp }}</p>
-                    </td>
-                  </tr>
-                </table>
-                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:22px;">
-                  <tr>
-                    <td style="width:8px;height:8px;background-color:#2c6bed;border-radius:50%;font-size:0;line-height:0;">&nbsp;</td>
-                    <td style="padding-left:9px;color:#56647a;font-size:13px;line-height:20px;">
-                      Válido durante {{ if .timeCode }}{{ .timeCode }}{{ else }}5 minutos{{ end }}.
-                    </td>
-                  </tr>
-                </table>
-                <p style="margin:0;color:#68758a;font-size:13px;line-height:21px;">No compartas este código. Si no solicitaste esta verificación, puedes ignorar este correo.</p>
+              <td class="pad-x" style="padding:36px 36px 8px;">
+                <p class="t-muted" style="margin:0 0 10px;color:#64748b;font-size:12px;line-height:18px;font-weight:600;letter-spacing:0.4px;">
+                  {{ if .eyebrow }}{{ .eyebrow }}{{ else }}VERIFICACIÓN DE CUENTA{{ end }}
+                </p>
+                <h1 class="h1 t-primary" style="margin:0;color:#0f172a;font-size:28px;line-height:36px;font-weight:700;letter-spacing:-0.5px;">
+                  {{ if .title }}{{ .title }}{{ else }}Confirma tu correo electrónico{{ end }}
+                </h1>
+                <p class="t-secondary" style="margin:14px 0 0;color:#334155;font-size:15px;line-height:24px;">
+                  {{ if .intro }}{{ .intro }}{{ else }}Introduce este código en Streaming para completar tu registro.{{ end }}
+                </p>
               </td>
             </tr>
+
+            <!-- Codigo -->
             <tr>
-              <td style="padding:18px 36px;background-color:#fafbfc;border-top:1px solid #edf0f4;border-radius:0 0 16px 16px;color:#8490a2;font-size:11px;line-height:18px;">
-                Este mensaje fue enviado automáticamente. No respondas a este correo.
+              <td class="pad-x" style="padding:24px 36px 0;">
+                <table role="presentation" class="code-box" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#ecfeff;border:1px solid #a5f3fc;border-radius:14px;">
+                  <tr>
+                    <td align="center" style="padding:26px 12px;">
+                      <!-- El codigo en cian y no en negro: es lo unico que hay que
+                           hacer en todo el correo, asi que se lleva el acento. -->
+                      <p class="code accent" style="margin:0;color:#0891b2;font-size:36px;line-height:44px;font-weight:700;letter-spacing:10px;">{{ .codeOtp }}</p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- Caducidad -->
+            <tr>
+              <td class="pad-x" style="padding:16px 36px 0;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td class="pill" style="background-color:#ecfeff;border-radius:999px;padding:6px 12px;color:#0e7490;font-size:12px;line-height:16px;font-weight:600;">
+                      Caduca en {{ if .timeCode }}{{ .timeCode }}{{ else }}5 minutos{{ end }}
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- Aviso -->
+            <tr>
+              <td class="pad-x" style="padding:22px 36px 34px;">
+                <p class="t-muted" style="margin:0;color:#64748b;font-size:13px;line-height:21px;">
+                  Nadie de Streaming te va a pedir este código. Si no solicitaste la verificación, ignora este mensaje y tu cuenta seguirá igual.
+                </p>
+              </td>
+            </tr>
+
+            <!-- Pie -->
+            <tr>
+              <td class="card-foot pad-x" style="padding:18px 36px;background-color:#f8fafc;border-top:1px solid #e2e8f0;border-radius:0 0 20px 20px;">
+                <p class="t-subtle" style="margin:0;color:#94a3b8;font-size:11px;line-height:18px;">
+                  Mensaje automático. No respondas a este correo.
+                </p>
               </td>
             </tr>
           </table>
-          <p style="margin:18px 0 0;color:#8490a2;font-size:11px;line-height:18px;text-align:center;">streaming · Seguridad de tu cuenta</p>
+
+          <p class="t-subtle" style="margin:18px 0 0;color:#94a3b8;font-size:11px;line-height:18px;text-align:center;">
+            Streaming · Seguridad de la cuenta
+          </p>
         </td>
       </tr>
     </table>

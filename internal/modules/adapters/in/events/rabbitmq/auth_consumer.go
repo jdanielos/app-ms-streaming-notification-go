@@ -34,6 +34,13 @@ func NewAuthEventConsumer(channel *amqp091.Channel, queueName *string, notifySer
 // escuchamos los eventos y se encolan el mensage para se procesado 1 por 1
 func (c *AuthEventConsumer) StartNofifyServices() {
 
+	// Sin esta guarda, un canal nil revienta con un panic que apunta aqui y no
+	// dice nada del motivo real, que esta en la construccion del broker.
+	if c.channel == nil || c.queueName == nil {
+		slog.Error("consumidor de auth sin canal de RabbitMQ, no se arranca")
+		return
+	}
+
 	msgs, err := c.channel.Consume(*c.queueName, "", false, false, false, false, nil)
 	if err != nil {
 		slog.Error("Error al registrar el canal")
