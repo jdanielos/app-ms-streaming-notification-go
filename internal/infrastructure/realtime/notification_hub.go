@@ -76,6 +76,20 @@ type CommentEvent struct {
 	TypingUser *commentUser `json:"typingUser"`
 }
 
+type CreatorFollowEvent struct {
+	CreatorID   string `json:"creatorId"`
+	ActorUserID string `json:"actorUserId"`
+	Following   bool   `json:"following"`
+	Kind        string `json:"kind"`
+}
+
+type creatorFollowEventPayload struct {
+	CreatorID   string `json:"creatorId"`
+	ActorUserID string `json:"actorUserId"`
+	Following   bool   `json:"following"`
+	Kind        string `json:"kind"`
+}
+
 type commentEventPayload struct {
 	VideoID    string       `json:"videoId"`
 	ParentID   *string      `json:"parentId"`
@@ -84,7 +98,7 @@ type commentEventPayload struct {
 	TypingUser *commentUser `json:"typingUser"`
 }
 
-type subscription struct{ kind, videoID string }
+type subscription struct{ kind, videoID, creatorID string }
 
 type client struct {
 	conn          *websocket.Conn
@@ -151,6 +165,14 @@ func (h *NotificationHub) Handle(conn *websocket.Conn) {
 					return
 				}
 				stream = subscription{kind: "comments", videoID: vars.VideoID}
+			} else if strings.Contains(payload.Query, "creatorFollowEvents") {
+				var vars struct {
+					CreatorID string `json:"creatorId"`
+				}
+				if err := json.Unmarshal(payload.Variables, &vars); err != nil || vars.CreatorID == "" {
+					return
+				}
+				stream = subscription{kind: "creator_follow", creatorID: vars.CreatorID}
 			}
 			current.mu.Lock()
 			current.subscriptions[message.ID] = stream
@@ -209,6 +231,24 @@ func (h *NotificationHub) PublishComment(event CommentEvent) {
 		c.writeStream("videoCommentEvents", payload, func(s subscription) bool { return s.kind == "comments" && strings.EqualFold(s.videoID, event.VideoID) })
 	}
 	slog.Info("comment_websocket_publish", "video_id", event.VideoID, "kind", event.Kind, "recipients", len(recipients))
+}
+
+func (h *NotificationHub) PublishCreatorFollow(event CreatorFollowEvent) {
+	h.mu.RLock()
+	recipients := make([]*client, 0)
+	for _, clients := range h.clients {
+		for c := range clients {
+			recipients = append(recipients, c)
+		}
+	}
+	h.mu.RUnlock()
+	payload := creatorFollowEventPayload{CreatorID: event.CreatorID, ActorUserID: event.ActorUserID, Following: event.Following, Kind: event.Kind}
+	for _, c := range recipients {
+		c.writeStream("creatorFollowEvents", payload, func(s subscription) bool {
+			return s.kind == "creator_follow" && strings.EqualFold(s.creatorID, event.CreatorID)
+		})
+	}
+	slog.Info("creator_follow_websocket_publish", "creator_id", event.CreatorID, "kind", event.Kind, "recipients", len(recipients))
 }
 
 func (c *client) writeStream(field string, data any, matches func(subscription) bool) {
