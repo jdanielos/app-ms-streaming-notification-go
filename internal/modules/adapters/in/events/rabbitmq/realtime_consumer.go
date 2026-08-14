@@ -3,6 +3,7 @@ package events
 import (
 	"encoding/json"
 	"log/slog"
+	"strings"
 
 	"github.com/rabbitmq/amqp091-go"
 	"github.com/streamingNotifyHub/internal/infrastructure/constants"
@@ -35,6 +36,10 @@ func (c *RealtimeCommentEventConsumer) Start() {
 		slog.Error("realtime_queue_bind_failed", "error", err)
 		return
 	}
+	if err := c.channel.QueueBind(constants.REALTIME_WEBSOCKET_QUEUE, "creator.*.follow.*", constants.REALTIME_WEBSOCKET_EXCHANGE, false, nil); err != nil {
+		slog.Error("realtime_creator_follow_queue_bind_failed", "error", err)
+		return
+	}
 	messages, err := c.channel.Consume(constants.REALTIME_WEBSOCKET_QUEUE, "notify-hub-realtime-comments", false, false, false, false, nil)
 	if err != nil {
 		slog.Error("realtime_consumer_register_failed", "error", err)
@@ -42,6 +47,18 @@ func (c *RealtimeCommentEventConsumer) Start() {
 	}
 	go func() {
 		for message := range messages {
+			if strings.HasPrefix(message.RoutingKey, "creator.") {
+				var event realtime.CreatorFollowEvent
+				if err := json.Unmarshal(message.Body, &event); err != nil {
+					slog.Error("realtime_creator_follow_event_decode_failed", "error", err)
+					_ = message.Nack(false, false)
+					continue
+				}
+				c.hub.PublishCreatorFollow(event)
+				_ = message.Ack(false)
+				continue
+			}
+
 			var event realtime.CommentEvent
 			if err := json.Unmarshal(message.Body, &event); err != nil {
 				slog.Error("realtime_event_decode_failed", "error", err)

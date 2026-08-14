@@ -39,3 +39,5 @@ go.work.sum
 localhost.pem
 .mkcert-v1.4.4-windows-arm64.exe
 .mkcert.exe
+# Cache de compilacion local (GOCACHE apuntado al repo). No es codigo.
+.gocache/
