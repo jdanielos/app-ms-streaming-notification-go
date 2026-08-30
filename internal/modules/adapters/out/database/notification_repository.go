@@ -17,7 +17,7 @@ type NotificationRepository struct {
 	pool *pgxpool.Pool
 }
 
-func (r *NotificationRepository) ListInbox(ctx context.Context, userID string, limit int, cursor string) (notification.InboxPage, error) {
+func (r *NotificationRepository) ListInbox(ctx context.Context, userID string, limit int, cursor string, category string) (notification.InboxPage, error) {
 	if limit < 1 {
 		limit = 30
 	}
@@ -50,9 +50,10 @@ func (r *NotificationRepository) ListInbox(ctx context.Context, userID string, l
 		WHERE n.user_id = $1
 		  AND (n.expires_at IS NULL OR n.expires_at > NOW())
 		  AND ($2::timestamptz IS NULL OR (n.created_at, n.notification_id) < ($2, $3::uuid))
+		  AND ($5 = '' OR n.category_code = $5)
 		ORDER BY n.created_at DESC, n.notification_id DESC
 		LIMIT $4`
-	rows, err := r.pool.Query(ctx, query, userID, cursorTime, cursorID, limit+1)
+	rows, err := r.pool.Query(ctx, query, userID, cursorTime, cursorID, limit+1, category)
 	if err != nil {
 		return notification.InboxPage{}, fmt.Errorf("consultando bandeja: %w", err)
 	}
@@ -86,6 +87,46 @@ func (r *NotificationRepository) ListInbox(ctx context.Context, userID string, l
 		page.NextCursor = &value
 	}
 	return page, nil
+}
+
+// ListCategories devuelve el catalogo activo con lo que este usuario tiene dentro.
+//
+// Sale del catalogo y no de las notificaciones —`LEFT JOIN` y no `GROUP BY` sobre
+// la tabla grande— para que una categoria sin nada siga apareciendo: el filtro
+// existe aunque hoy este vacio, y una lista de filtros que cambia de tamano segun
+// lo que haya llegado se mueve bajo el dedo.
+//
+// El recuento se limita al mismo universo que la bandeja: sin caducadas. Si no,
+// el filtro prometeria diez y al abrirlo mostraria seis.
+func (r *NotificationRepository) ListCategories(ctx context.Context, userID string) ([]notification.CategorySummary, error) {
+	const query = `
+		SELECT c.category_code, c.display_name_es, c.display_name_en,
+		       COUNT(n.notification_id)                                    AS total,
+		       COUNT(n.notification_id) FILTER (WHERE n.read_at IS NULL)    AS unread
+		FROM ecosystem_core_auth.notification_categories c
+		LEFT JOIN ecosystem_core_auth.notifications n
+		       ON n.category_code = c.category_code
+		      AND n.user_id = $1
+		      AND (n.expires_at IS NULL OR n.expires_at > NOW())
+		WHERE c.is_active = true
+		GROUP BY c.category_code, c.display_name_es, c.display_name_en
+		ORDER BY total DESC, c.category_code`
+
+	rows, err := r.pool.Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("consultando categorias: %w", err)
+	}
+	defer rows.Close()
+
+	categories := make([]notification.CategorySummary, 0, 8)
+	for rows.Next() {
+		var item notification.CategorySummary
+		if err := rows.Scan(&item.Code, &item.DisplayNameEs, &item.DisplayNameEn, &item.Total, &item.Unread); err != nil {
+			return nil, err
+		}
+		categories = append(categories, item)
+	}
+	return categories, rows.Err()
 }
 
 func (r *NotificationRepository) UnreadCount(ctx context.Context, userID string) (int, error) {

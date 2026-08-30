@@ -28,6 +28,12 @@ type NotificationRepositoryInterface interface {
 	// funcionamiento normal, no la excepcion. El llamador confirma el mensaje
 	// igual.
 	Save(ctx context.Context, item notification.Notification, deliveries []notification.Delivery) (inserted bool, err error)
-	ListInbox(ctx context.Context, userID string, limit int, cursor string) (notification.InboxPage, error)
+	// `category` vacio devuelve la bandeja entera. El filtro va en la consulta y
+	// no en el cliente porque la bandeja se pagina: filtrar despues de traer la
+	// pagina devolveria tres elementos de treinta y el resto quedaria escondido
+	// detras de un "cargar mas" que el usuario no sabe que tiene que pulsar.
+	ListInbox(ctx context.Context, userID string, limit int, cursor string, category string) (notification.InboxPage, error)
 	UnreadCount(ctx context.Context, userID string) (int, error)
+	// El catalogo activo con lo que este usuario tiene en cada categoria.
+	ListCategories(ctx context.Context, userID string) ([]notification.CategorySummary, error)
 }
