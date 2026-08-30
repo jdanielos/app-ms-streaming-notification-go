@@ -98,6 +98,17 @@ type InboxItem struct {
 	CreatedAt      string  `json:"createdAt"`
 }
 
+// CategorySummary es una categoria del catalogo con lo que ese usuario tiene
+// dentro. Va junta —nombre y recuento— porque la bandeja las pinta como filtros:
+// un filtro sin su cifra obliga a pulsarlo para saber si tiene algo.
+type CategorySummary struct {
+	Code          string `json:"code"`
+	DisplayNameEs string `json:"displayNameEs"`
+	DisplayNameEn string `json:"displayNameEn"`
+	Total         int    `json:"total"`
+	Unread        int    `json:"unread"`
+}
+
 type InboxPage struct {
 	Items      []InboxItem `json:"items"`
 	NextCursor *string     `json:"nextCursor"`

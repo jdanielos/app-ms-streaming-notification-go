@@ -28,6 +28,7 @@ func ConfigureNotificationWebsocket(
 		Routes: []types.HandlerModule{
 			{Route: constants.API_ROUTER_STABLE + "/graphql/ws", Method: "GET", Handler: websocket.New(hub.Handle, websocket.Config{Subprotocols: []string{"graphql-transport-ws"}})},
 			{Route: constants.API_ROUTER_STABLE + "/notifications", Method: "GET", Handler: inbox.GetInbox},
+			{Route: constants.API_ROUTER_STABLE + "/notifications/categories", Method: "GET", Handler: inbox.GetCategories},
 		},
 	})
 }
