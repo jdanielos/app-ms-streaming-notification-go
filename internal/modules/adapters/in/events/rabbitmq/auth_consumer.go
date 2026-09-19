@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/rabbitmq/amqp091-go"
+	"github.com/streamingNotifyHub/internal/infrastructure/brokers"
 	dto "github.com/streamingNotifyHub/internal/modules/adapters/in/events/Dto"
 	"github.com/streamingNotifyHub/internal/modules/core/notifications"
 )
@@ -19,12 +20,18 @@ type AuthEventConsumer struct {
 	notifyServices *notifications.NotificationServices
 	isPaused       bool
 	mu             sync.Mutex // asegurar concurrencia acceso unica vez por peticion
+	// Pide un canal NUEVO cuando el actual muere - ver la nota de
+	// `ChannelFactory` en el paquete brokers. Sin esto, si Rabbit se caia
+	// este consumidor se quedaba en silencio para siempre y los correos de
+	// OTP dejaban de salir sin ningun aviso.
+	newChannel brokers.ChannelFactory
 }
 
 // crea el "constructor" para pasar la informacion donde se llame ene este caso en fx(server)
-func NewAuthEventConsumer(channel *amqp091.Channel, queueName *string, notifyServices *notifications.NotificationServices) *AuthEventConsumer {
+func NewAuthEventConsumer(channel *amqp091.Channel, newChannel brokers.ChannelFactory, queueName *string, notifyServices *notifications.NotificationServices) *AuthEventConsumer {
 	return &AuthEventConsumer{
 		channel:        channel,
+		newChannel:     newChannel,
 		queueName:      queueName,
 		notifyServices: notifyServices,
 	}
@@ -44,10 +51,47 @@ func (c *AuthEventConsumer) StartNofifyServices() {
 	msgs, err := c.channel.Consume(*c.queueName, "", false, false, false, false, nil)
 	if err != nil {
 		slog.Error("Error al registrar el canal")
+		return
 	}
 
+	go func() {
+		// Mismo motivo que los otros dos consumidores: el `range` de cada
+		// worker TERMINA cuando RabbitMQ cierra la conexion, y reintentar
+		// sobre el mismo canal ya muerto nunca se recupera - hace falta uno
+		// nuevo, pedido con `newChannel()`.
+		for {
+			c.runWorkers(msgs)
+
+			slog.Error("auth_consumer_stream_closed", "queue", *c.queueName)
+
+			for espera := time.Second; ; {
+				newCh, err := c.newChannel()
+				if err == nil {
+					msgs, err = newCh.Consume(*c.queueName, "", false, false, false, false, nil)
+				}
+				if err == nil {
+					c.channel = newCh
+					slog.Info("auth_consumer_resumed", "queue", *c.queueName)
+					break
+				}
+				slog.Error("auth_consumer_resume_failed", "error", err, "retry_in", espera.String())
+				time.Sleep(espera)
+				if espera < 30*time.Second {
+					espera *= 2
+				}
+			}
+		}
+	}()
+}
+
+// runWorkers levanta los 5 workers de siempre y bloquea hasta que todos
+// terminan - exactamente cuando `msgs` se cierra por una conexion caida.
+func (c *AuthEventConsumer) runWorkers(msgs <-chan amqp091.Delivery) {
+	var wg sync.WaitGroup
 	for i := 0; i < 5; i++ {
+		wg.Add(1)
 		go func(workerID int) {
+			defer wg.Done()
 			for d := range msgs {
 
 				// bloqueo de mensageria
@@ -99,4 +143,5 @@ func (c *AuthEventConsumer) StartNofifyServices() {
 			}
 		}(i)
 	}
+	wg.Wait()
 }

@@ -66,6 +66,8 @@ type comment struct {
 	IsMine            bool    `json:"isMine"`
 	IsLikedByMe       bool    `json:"isLikedByMe"`
 	RepliesCount      int64   `json:"repliesCount"`
+	IsDeleted         bool    `json:"isDeleted"`
+	IsAnnulled        bool    `json:"isAnnulled"`
 }
 
 type CommentEvent struct {
@@ -74,6 +76,7 @@ type CommentEvent struct {
 	Kind       string       `json:"kind"`
 	Comment    *comment     `json:"comment"`
 	TypingUser *commentUser `json:"typingUser"`
+	LikesCount *int64       `json:"likesCount"`
 }
 
 type CreatorFollowEvent struct {
@@ -96,6 +99,10 @@ type commentEventPayload struct {
 	Kind       string       `json:"kind"`
 	Comment    *comment     `json:"comment"`
 	TypingUser *commentUser `json:"typingUser"`
+	// Solo lo trae el kind "video_liked" - el like del video en si, no de un
+	// comentario. Viaja por el mismo canal que los comentarios para que el
+	// cliente que ya esta suscrito al video no necesite un segundo socket.
+	LikesCount *int64 `json:"likesCount"`
 }
 
 type subscription struct{ kind, videoID, creatorID string }
@@ -226,7 +233,7 @@ func (h *NotificationHub) PublishComment(event CommentEvent) {
 		}
 	}
 	h.mu.RUnlock()
-	payload := commentEventPayload{VideoID: event.VideoID, ParentID: event.ParentID, Kind: event.Kind, Comment: event.Comment, TypingUser: event.TypingUser}
+	payload := commentEventPayload{VideoID: event.VideoID, ParentID: event.ParentID, Kind: event.Kind, Comment: event.Comment, TypingUser: event.TypingUser, LikesCount: event.LikesCount}
 	for _, c := range recipients {
 		c.writeStream("videoCommentEvents", payload, func(s subscription) bool { return s.kind == "comments" && strings.EqualFold(s.videoID, event.VideoID) })
 	}

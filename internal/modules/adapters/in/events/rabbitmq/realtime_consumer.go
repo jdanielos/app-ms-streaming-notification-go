@@ -7,17 +7,46 @@ import (
 	"time"
 
 	"github.com/rabbitmq/amqp091-go"
+	"github.com/streamingNotifyHub/internal/infrastructure/brokers"
 	"github.com/streamingNotifyHub/internal/infrastructure/constants"
 	"github.com/streamingNotifyHub/internal/infrastructure/realtime"
 )
 
 type RealtimeCommentEventConsumer struct {
 	channel *amqp091.Channel
-	hub     *realtime.NotificationHub
+	// Pide un canal NUEVO cuando el actual muere. Reintentar `Consume` sobre
+	// el mismo `channel` de arriba nunca se recupera de una conexion caida -
+	// ver la nota de `ChannelFactory`.
+	newChannel brokers.ChannelFactory
+	hub        *realtime.NotificationHub
 }
 
-func NewRealtimeCommentEventConsumer(channel *amqp091.Channel, hub *realtime.NotificationHub) *RealtimeCommentEventConsumer {
-	return &RealtimeCommentEventConsumer{channel: channel, hub: hub}
+func NewRealtimeCommentEventConsumer(channel *amqp091.Channel, newChannel brokers.ChannelFactory, hub *realtime.NotificationHub) *RealtimeCommentEventConsumer {
+	return &RealtimeCommentEventConsumer{channel: channel, newChannel: newChannel, hub: hub}
+}
+
+// setupTopology declara el exchange, la cola y los dos bindings sobre el
+// canal que se le pase. Un canal recien abierto no hereda nada de lo que se
+// declaro en uno anterior - hace falta repetirlo cada vez que se reconecta,
+// no solo la primera vez. Declarar algo que ya existe (con los mismos
+// argumentos) no falla, asi que es seguro repetirlo.
+func setupTopology(ch *amqp091.Channel) error {
+	if err := ch.ExchangeDeclare(constants.REALTIME_WEBSOCKET_EXCHANGE, "topic", true, false, false, false, nil); err != nil {
+		return err
+	}
+	if _, err := ch.QueueDeclare(constants.REALTIME_WEBSOCKET_QUEUE, true, false, false, false, nil); err != nil {
+		return err
+	}
+	if err := ch.QueueBind(constants.REALTIME_WEBSOCKET_QUEUE, "video.*.comment.*", constants.REALTIME_WEBSOCKET_EXCHANGE, false, nil); err != nil {
+		return err
+	}
+	if err := ch.QueueBind(constants.REALTIME_WEBSOCKET_QUEUE, "video.*.like.*", constants.REALTIME_WEBSOCKET_EXCHANGE, false, nil); err != nil {
+		return err
+	}
+	if err := ch.QueueBind(constants.REALTIME_WEBSOCKET_QUEUE, "creator.*.follow.*", constants.REALTIME_WEBSOCKET_EXCHANGE, false, nil); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *RealtimeCommentEventConsumer) Start() {
@@ -25,20 +54,8 @@ func (c *RealtimeCommentEventConsumer) Start() {
 		slog.Error("realtime_consumer_without_rabbit_channel")
 		return
 	}
-	if err := c.channel.ExchangeDeclare(constants.REALTIME_WEBSOCKET_EXCHANGE, "topic", true, false, false, false, nil); err != nil {
-		slog.Error("realtime_exchange_declare_failed", "error", err)
-		return
-	}
-	if _, err := c.channel.QueueDeclare(constants.REALTIME_WEBSOCKET_QUEUE, true, false, false, false, nil); err != nil {
-		slog.Error("realtime_queue_declare_failed", "error", err)
-		return
-	}
-	if err := c.channel.QueueBind(constants.REALTIME_WEBSOCKET_QUEUE, "video.*.comment.*", constants.REALTIME_WEBSOCKET_EXCHANGE, false, nil); err != nil {
-		slog.Error("realtime_queue_bind_failed", "error", err)
-		return
-	}
-	if err := c.channel.QueueBind(constants.REALTIME_WEBSOCKET_QUEUE, "creator.*.follow.*", constants.REALTIME_WEBSOCKET_EXCHANGE, false, nil); err != nil {
-		slog.Error("realtime_creator_follow_queue_bind_failed", "error", err)
+	if err := setupTopology(c.channel); err != nil {
+		slog.Error("realtime_topology_setup_failed", "error", err)
 		return
 	}
 	messages, err := c.channel.Consume(constants.REALTIME_WEBSOCKET_QUEUE, "notify-hub-realtime-comments", false, false, false, false, nil)
@@ -61,13 +78,20 @@ func (c *RealtimeCommentEventConsumer) Start() {
 
 			slog.Error("realtime_consumer_stream_closed", "queue", constants.REALTIME_WEBSOCKET_QUEUE)
 
-			// Se reintenta suscribirse. Si lo que se cerro fue solo el canal, esto
-			// lo recupera solo; si lo que murio es la conexion entera, cada intento
-			// falla y lo deja escrito, que es mejor que el silencio de antes.
-			var err error
+			// Se pide un canal NUEVO, no se reintenta sobre el viejo: ese ya
+			// esta muerto (fue lo que cerro el `range` de arriba) y volver a
+			// llamar `Consume` en el nunca funciona, solo repite el mismo
+			// error para siempre. `newChannel()` redialea la conexion si
+			// hace falta.
 			for espera := time.Second; ; {
-				messages, err = c.channel.Consume(constants.REALTIME_WEBSOCKET_QUEUE, "notify-hub-realtime-comments", false, false, false, false, nil)
+				newCh, err := c.newChannel()
 				if err == nil {
+					if err = setupTopology(newCh); err == nil {
+						messages, err = newCh.Consume(constants.REALTIME_WEBSOCKET_QUEUE, "notify-hub-realtime-comments", false, false, false, false, nil)
+					}
+				}
+				if err == nil {
+					c.channel = newCh
 					slog.Info("realtime_consumer_resumed", "queue", constants.REALTIME_WEBSOCKET_QUEUE)
 					break
 				}
