@@ -17,18 +17,26 @@ import (
 // es un fallo, asi que inyectaba el canal nil y el proceso reventaba mucho
 // despues, dentro del consumidor, con un panic que no dice nada de la causa.
 // Devolviendo error, fx aborta el arranque y escribe el motivo real.
-func NewRabbitMQChannel(lc fx.Lifecycle) (*amqp091.Channel, *string, error) {
+func NewRabbitMQChannel(lc fx.Lifecycle) (*amqp091.Channel, *string, ChannelFactory, error) {
+	url := os.Getenv(constants.ENV_RABBITMQ_URL)
+
 	// 1. Conexión
-	conn, err := amqp091.Dial(os.Getenv(constants.ENV_RABBITMQ_URL))
+	conn, err := amqp091.Dial(url)
 	if err != nil {
-		return nil, nil, fmt.Errorf("no se pudo conectar a RabbitMQ: %w", err)
+		return nil, nil, nil, fmt.Errorf("no se pudo conectar a RabbitMQ: %w", err)
 	}
+
+	// El manejador guarda ESTA conexion y sabe redialear si se cae. Se crea
+	// antes de abrir el canal para que, si algo de aqui en adelante falla y
+	// hay que reabrir el canal (ver el bloque del error 406 mas abajo), pase
+	// por el mismo camino que usaran los consumidores al recuperarse despues.
+	connManager := newRabbitConnectionManager(url, conn)
 
 	// 2. Canal
 	ch, err := conn.Channel()
 	if err != nil {
 		conn.Close()
-		return nil, nil, fmt.Errorf("no se pudo abrir el canal: %w", err)
+		return nil, nil, nil, fmt.Errorf("no se pudo abrir el canal: %w", err)
 	}
 
 	// microservicios publican mensages en esta direccion
@@ -36,7 +44,7 @@ func NewRabbitMQChannel(lc fx.Lifecycle) (*amqp091.Channel, *string, error) {
 	if exchangeName == "" {
 		ch.Close()
 		conn.Close()
-		return nil, nil, fmt.Errorf("variable %s no configurada", constants.ENV_CHANELRABBITMQ_NOTIFY_TOPIC)
+		return nil, nil, nil, fmt.Errorf("variable %s no configurada", constants.ENV_CHANELRABBITMQ_NOTIFY_TOPIC)
 	}
 	err = ch.ExchangeDeclare(
 		exchangeName,
@@ -48,7 +56,7 @@ func NewRabbitMQChannel(lc fx.Lifecycle) (*amqp091.Channel, *string, error) {
 		nil,
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("declarando exchange %q: %w", exchangeName, err)
+		return nil, nil, nil, fmt.Errorf("declarando exchange %q: %w", exchangeName, err)
 	}
 
 	queueName := os.Getenv(constants.ENV_CHANELRABBITMQ_NOTIFY_RMSG)
@@ -62,16 +70,16 @@ func NewRabbitMQChannel(lc fx.Lifecycle) (*amqp091.Channel, *string, error) {
 	// mensaje se aparta y la cola sigue.
 	err = ch.ExchangeDeclare(constants.CHANELRABBITMQ_NOTIFY_DLX, "fanout", true, false, false, false, nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("declarando dead letter exchange: %w", err)
+		return nil, nil, nil, fmt.Errorf("declarando dead letter exchange: %w", err)
 	}
 
 	_, err = ch.QueueDeclare(constants.CHANELRABBITMQ_NOTIFY_DLQ, true, false, false, false, nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("declarando dead letter queue: %w", err)
+		return nil, nil, nil, fmt.Errorf("declarando dead letter queue: %w", err)
 	}
 
 	if err = ch.QueueBind(constants.CHANELRABBITMQ_NOTIFY_DLQ, "", constants.CHANELRABBITMQ_NOTIFY_DLX, false, nil); err != nil {
-		return nil, nil, fmt.Errorf("vinculando dead letter queue: %w", err)
+		return nil, nil, nil, fmt.Errorf("vinculando dead letter queue: %w", err)
 	}
 
 	// donde se lee los mensages de RabbitMQ
@@ -99,14 +107,14 @@ func NewRabbitMQChannel(lc fx.Lifecycle) (*amqp091.Channel, *string, error) {
 		ch, err = conn.Channel()
 		if err != nil {
 			conn.Close()
-			return nil, nil, fmt.Errorf("reabriendo el canal tras el fallo de declaracion: %w", err)
+			return nil, nil, nil, fmt.Errorf("reabriendo el canal tras el fallo de declaracion: %w", err)
 		}
 
 		// Segundo intento con la configuracion que la cola ya tiene.
 		if _, err = ch.QueueDeclare(queueName, true, false, false, false, nil); err != nil {
 			ch.Close()
 			conn.Close()
-			return nil, nil, fmt.Errorf("declarando la cola %q: %w", queueName, err)
+			return nil, nil, nil, fmt.Errorf("declarando la cola %q: %w", queueName, err)
 		}
 
 		slog.Warn("la cola existe sin dead letter exchange: los mensajes descartados NO van a la DLQ",
@@ -125,7 +133,7 @@ func NewRabbitMQChannel(lc fx.Lifecycle) (*amqp091.Channel, *string, error) {
 	if err != nil {
 		ch.Close()
 		conn.Close()
-		return nil, nil, fmt.Errorf("vinculando cola %q al exchange %q: %w", queueName, exchangeName, err)
+		return nil, nil, nil, fmt.Errorf("vinculando cola %q al exchange %q: %w", queueName, exchangeName, err)
 	}
 
 	// El prefetch lo fija cada consumidor al arrancar, segun cuantos workers
@@ -135,9 +143,9 @@ func NewRabbitMQChannel(lc fx.Lifecycle) (*amqp091.Channel, *string, error) {
 		OnStop: func(ctx context.Context) error {
 			slog.Info("Cerrando conexión de RabbitMQ...")
 			ch.Close()
-			return conn.Close()
+			return connManager.Close()
 		},
 	})
 
-	return ch, &queueName, nil
+	return ch, &queueName, connManager.Channel, nil
 }

@@ -66,6 +66,8 @@ type comment struct {
 	IsMine            bool    `json:"isMine"`
 	IsLikedByMe       bool    `json:"isLikedByMe"`
 	RepliesCount      int64   `json:"repliesCount"`
+	IsDeleted         bool    `json:"isDeleted"`
+	IsAnnulled        bool    `json:"isAnnulled"`
 }
 
 type CommentEvent struct {
@@ -74,6 +76,7 @@ type CommentEvent struct {
 	Kind       string       `json:"kind"`
 	Comment    *comment     `json:"comment"`
 	TypingUser *commentUser `json:"typingUser"`
+	LikesCount *int64       `json:"likesCount"`
 }
 
 type CreatorFollowEvent struct {
@@ -83,11 +86,23 @@ type CreatorFollowEvent struct {
 	Kind        string `json:"kind"`
 }
 
+type LiveChatEvent struct {
+	SessionID string          `json:"sessionId"`
+	Kind      string          `json:"kind"`
+	Message   json.RawMessage `json:"message"`
+}
+
 type creatorFollowEventPayload struct {
 	CreatorID   string `json:"creatorId"`
 	ActorUserID string `json:"actorUserId"`
 	Following   bool   `json:"following"`
 	Kind        string `json:"kind"`
+}
+
+type liveChatEventPayload struct {
+	SessionID string          `json:"sessionId"`
+	Kind      string          `json:"kind"`
+	Message   json.RawMessage `json:"message"`
 }
 
 type commentEventPayload struct {
@@ -96,9 +111,13 @@ type commentEventPayload struct {
 	Kind       string       `json:"kind"`
 	Comment    *comment     `json:"comment"`
 	TypingUser *commentUser `json:"typingUser"`
+	// Solo lo trae el kind "video_liked" - el like del video en si, no de un
+	// comentario. Viaja por el mismo canal que los comentarios para que el
+	// cliente que ya esta suscrito al video no necesite un segundo socket.
+	LikesCount *int64 `json:"likesCount"`
 }
 
-type subscription struct{ kind, videoID, creatorID string }
+type subscription struct{ kind, videoID, creatorID, liveSessionID string }
 
 type client struct {
 	conn          *websocket.Conn
@@ -173,11 +192,19 @@ func (h *NotificationHub) Handle(conn *websocket.Conn) {
 					return
 				}
 				stream = subscription{kind: "creator_follow", creatorID: vars.CreatorID}
+			} else if strings.Contains(payload.Query, "liveChatEvents") {
+				var vars struct {
+					SessionID string `json:"sessionId"`
+				}
+				if err := json.Unmarshal(payload.Variables, &vars); err != nil || vars.SessionID == "" {
+					return
+				}
+				stream = subscription{kind: "live_chat", liveSessionID: vars.SessionID}
 			}
 			current.mu.Lock()
 			current.subscriptions[message.ID] = stream
 			current.mu.Unlock()
-			slog.Info("notification_websocket_subscribed", "user_id", accountID, "subscription_id", message.ID, "stream", stream.kind, "video_id", stream.videoID)
+			slog.Info("notification_websocket_subscribed", "user_id", accountID, "subscription_id", message.ID, "stream", stream.kind, "video_id", stream.videoID, "live_session_id", stream.liveSessionID)
 		case "typing":
 			if current == nil || accountID == "" {
 				return
@@ -203,6 +230,25 @@ func (h *NotificationHub) Handle(conn *websocket.Conn) {
 	}
 }
 
+func (h *NotificationHub) PublishLiveChat(event LiveChatEvent) {
+	h.mu.RLock()
+	recipients := make([]*client, 0)
+	for _, clients := range h.clients {
+		for c := range clients {
+			recipients = append(recipients, c)
+		}
+	}
+	h.mu.RUnlock()
+
+	payload := liveChatEventPayload{SessionID: event.SessionID, Kind: event.Kind, Message: event.Message}
+	for _, c := range recipients {
+		c.writeStream("liveChatEvents", payload, func(s subscription) bool {
+			return s.kind == "live_chat" && strings.EqualFold(s.liveSessionID, event.SessionID)
+		})
+	}
+	slog.Info("live_chat_websocket_publish", "session_id", event.SessionID, "kind", event.Kind, "recipients", len(recipients))
+}
+
 func (h *NotificationHub) Publish(item notification.Notification) {
 	h.mu.RLock()
 	users := make([]*client, 0, len(h.clients[item.UserID]))
@@ -226,7 +272,7 @@ func (h *NotificationHub) PublishComment(event CommentEvent) {
 		}
 	}
 	h.mu.RUnlock()
-	payload := commentEventPayload{VideoID: event.VideoID, ParentID: event.ParentID, Kind: event.Kind, Comment: event.Comment, TypingUser: event.TypingUser}
+	payload := commentEventPayload{VideoID: event.VideoID, ParentID: event.ParentID, Kind: event.Kind, Comment: event.Comment, TypingUser: event.TypingUser, LikesCount: event.LikesCount}
 	for _, c := range recipients {
 		c.writeStream("videoCommentEvents", payload, func(s subscription) bool { return s.kind == "comments" && strings.EqualFold(s.videoID, event.VideoID) })
 	}

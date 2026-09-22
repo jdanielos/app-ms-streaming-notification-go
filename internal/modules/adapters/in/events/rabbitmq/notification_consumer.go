@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/rabbitmq/amqp091-go"
+	"github.com/streamingNotifyHub/internal/infrastructure/brokers"
 	"github.com/streamingNotifyHub/internal/infrastructure/constants"
 	dto "github.com/streamingNotifyHub/internal/modules/adapters/in/events/Dto"
 	"github.com/streamingNotifyHub/internal/modules/core/notifications"
@@ -29,19 +31,26 @@ type NotificationEventConsumer struct {
 	queueName *string
 	usecase   *notifications.ProcessNotificationUseCase
 	debouncer *notifications.NotificationDebouncer
+	// Pide un canal NUEVO cuando el actual muere - ver la nota de
+	// `ChannelFactory`. Antes esto no existia: si Rabbit se caia, los 5
+	// workers simplemente terminaban su `range` y el consumidor se quedaba
+	// en silencio para siempre, sin un solo log que lo avisara.
+	newChannel brokers.ChannelFactory
 }
 
 func NewNotificationEventConsumer(
 	channel *amqp091.Channel,
 	queueName *string,
+	newChannel brokers.ChannelFactory,
 	usecase *notifications.ProcessNotificationUseCase,
 	debouncer *notifications.NotificationDebouncer,
 ) *NotificationEventConsumer {
 	return &NotificationEventConsumer{
-		channel:   channel,
-		queueName: queueName,
-		usecase:   usecase,
-		debouncer: debouncer,
+		channel:    channel,
+		queueName:  queueName,
+		newChannel: newChannel,
+		usecase:    usecase,
+		debouncer:  debouncer,
 	}
 }
 
@@ -51,32 +60,72 @@ func (c *NotificationEventConsumer) Start() {
 		return
 	}
 
-	// Limita cuantos mensajes sin confirmar se lleva este consumidor. Sin esto
-	// RabbitMQ entrega la cola entera de golpe: los workers se la traen a
-	// memoria y, si el proceso muere, todo eso vuelve a la cola a la vez.
-	if err := c.channel.Qos(constants.RABBITMQ_PREFETCH, 0, false); err != nil {
-		slog.Error("no se pudo fijar el prefetch", "error", err)
-		return
-	}
-
-	messages, err := c.channel.Consume(*c.queueName, "", false, false, false, false, nil)
+	messages, err := c.consume(c.channel)
 	if err != nil {
 		slog.Error("no se pudo registrar el consumidor", "error", err)
 		return
 	}
 
-	for worker := 0; worker < consumerWorkers; worker++ {
-		go func(workerID int) {
-			for message := range messages {
-				c.handle(message, workerID)
+	go func() {
+		// Mismo motivo que `realtime_consumer.go`: el `range` de cada worker
+		// TERMINA cuando RabbitMQ cierra la conexion, y reintentar sobre el
+		// mismo canal ya muerto nunca se recupera - hace falta uno nuevo.
+		for {
+			c.runWorkers(messages)
+
+			slog.Error("notification_consumer_stream_closed", "queue", *c.queueName)
+
+			for espera := time.Second; ; {
+				newCh, err := c.newChannel()
+				if err == nil {
+					messages, err = c.consume(newCh)
+				}
+				if err == nil {
+					c.channel = newCh
+					slog.Info("notification_consumer_resumed", "queue", *c.queueName)
+					break
+				}
+				slog.Error("notification_consumer_resume_failed", "error", err, "retry_in", espera.String())
+				time.Sleep(espera)
+				if espera < 30*time.Second {
+					espera *= 2
+				}
 			}
-		}(worker)
-	}
+		}
+	}()
 
 	slog.Info("consumidor de notificaciones activo",
 		slog.Int("workers", consumerWorkers),
 		slog.Int("prefetch", constants.RABBITMQ_PREFETCH),
 	)
+}
+
+// consume fija el prefetch (es por canal, no sobrevive a un canal nuevo) y
+// registra el consumidor sobre `ch`.
+func (c *NotificationEventConsumer) consume(ch *amqp091.Channel) (<-chan amqp091.Delivery, error) {
+	// Limita cuantos mensajes sin confirmar se lleva este consumidor. Sin esto
+	// RabbitMQ entrega la cola entera de golpe: los workers se la traen a
+	// memoria y, si el proceso muere, todo eso vuelve a la cola a la vez.
+	if err := ch.Qos(constants.RABBITMQ_PREFETCH, 0, false); err != nil {
+		return nil, err
+	}
+	return ch.Consume(*c.queueName, "", false, false, false, false, nil)
+}
+
+// runWorkers levanta los workers y bloquea hasta que todos terminan -
+// exactamente cuando `messages` se cierra por una conexion caida.
+func (c *NotificationEventConsumer) runWorkers(messages <-chan amqp091.Delivery) {
+	var wg sync.WaitGroup
+	for worker := 0; worker < consumerWorkers; worker++ {
+		wg.Add(1)
+		go func(workerID int) {
+			defer wg.Done()
+			for message := range messages {
+				c.handle(message, workerID)
+			}
+		}(worker)
+	}
+	wg.Wait()
 }
 
 func (c *NotificationEventConsumer) handle(message amqp091.Delivery, workerID int) {
