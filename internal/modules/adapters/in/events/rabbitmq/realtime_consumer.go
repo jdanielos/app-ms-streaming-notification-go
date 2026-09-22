@@ -46,6 +46,9 @@ func setupTopology(ch *amqp091.Channel) error {
 	if err := ch.QueueBind(constants.REALTIME_WEBSOCKET_QUEUE, "creator.*.follow.*", constants.REALTIME_WEBSOCKET_EXCHANGE, false, nil); err != nil {
 		return err
 	}
+	if err := ch.QueueBind(constants.REALTIME_WEBSOCKET_QUEUE, "live.*.chat.*", constants.REALTIME_WEBSOCKET_EXCHANGE, false, nil); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -111,6 +114,17 @@ func (c *RealtimeCommentEventConsumer) Start() {
 /** Consume hasta que el flujo se cierre. */
 func consumirMensajes(c *RealtimeCommentEventConsumer, messages <-chan amqp091.Delivery) {
 	for message := range messages {
+		if strings.HasPrefix(message.RoutingKey, "live.") {
+			var event realtime.LiveChatEvent
+			if err := json.Unmarshal(message.Body, &event); err != nil || event.SessionID == "" || len(event.Message) == 0 {
+				slog.Error("realtime_live_chat_event_decode_failed", "error", err, "routing_key", message.RoutingKey)
+				_ = message.Nack(false, false)
+				continue
+			}
+			c.hub.PublishLiveChat(event)
+			_ = message.Ack(false)
+			continue
+		}
 		if strings.HasPrefix(message.RoutingKey, "creator.") {
 			var event realtime.CreatorFollowEvent
 			if err := json.Unmarshal(message.Body, &event); err != nil {
