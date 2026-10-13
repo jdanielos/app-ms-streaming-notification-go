@@ -28,7 +28,11 @@ func setRoutersByModules(app *fiber.App, h *types.HandlersStore, _ *config.AppSe
 
 func NewFiberServer(lc fx.Lifecycle, h *types.HandlersStore, appsettings *config.AppSettings) *fiber.App {
 	// 1. Preparar logs
-	logDir := "logs"
+	// LOG_DIR permite sacar los logs fuera del repo (lo define ecosystem.config.json).
+	logDir := os.Getenv("LOG_DIR")
+	if logDir == "" {
+		logDir = "logs"
+	}
 	os.MkdirAll(logDir, 0755)
 	logFileName := fmt.Sprintf("%s/%s.log", logDir, time.Now().Format("2006-01-02"))
 	logFile, _ := os.OpenFile(logFileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
