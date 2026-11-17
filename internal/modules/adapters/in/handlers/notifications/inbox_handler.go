@@ -55,3 +55,26 @@ func (h *InboxHandler) GetCategories(c *fiber.Ctx) error {
 	}
 	return c.JSON(fiber.Map{"data": categories})
 }
+
+// MarkAllRead deja leidas las pendientes del usuario (POST .../notifications/read-all).
+//
+// Antes el boton "Marcar todas como leidas" solo cambiaba la lista en el
+// navegador: al reabrir la campana la bandeja venia otra vez del servidor sin
+// leer. `?category=` limita a la categoria abierta; sin el, todas.
+func (h *InboxHandler) MarkAllRead(c *fiber.Ctx) error {
+	userID := c.Get("x-account-id")
+	if userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "x-account-id requerido"})
+	}
+	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
+	defer cancel()
+	updated, err := h.repository.MarkAllRead(ctx, userID, c.Query("category"))
+	if err != nil {
+		return err
+	}
+	count, err := h.repository.UnreadCount(ctx, userID)
+	if err != nil {
+		return err
+	}
+	return c.JSON(fiber.Map{"data": fiber.Map{"updated": updated}, "unreadCount": count})
+}

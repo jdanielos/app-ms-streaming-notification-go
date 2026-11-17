@@ -33,7 +33,7 @@ func (uc *SendClientOtpEmaisUseCase) ExecuteSendClientEmailsUseCase(data command
 	}
 	code := fmt.Sprintf("%06d", rand.Intn(1000000))
 
-	data.Subject = fmt.Sprintf("Tu codigo es: %s", code)
+	data.Subject = fmt.Sprintf("Tu código de verificación es %s", code)
 
 	dataTemplated := map[string]interface{}{
 		"codeOtp":  code,

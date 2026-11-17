@@ -4,149 +4,124 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="x-apple-disable-message-reformatting" />
-    <!-- Sin esto, los clientes en oscuro invierten los colores por su cuenta y
-         rompen el contraste del bloque del codigo. -->
     <meta name="color-scheme" content="light dark" />
     <meta name="supported-color-schemes" content="light dark" />
-    <title>{{ if .title }}{{ .title }}{{ else }}Confirma tu correo electrónico{{ end }}</title>
+    <title>{{ if .title }}{{ .title }}{{ else }}Tu código de verificación{{ end }}</title>
+    <!-- Roboto donde el cliente permite fuentes remotas (Apple Mail, iOS, Outlook.com);
+         el resto cae a la del sistema con el mismo peso visual. -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
     <style>
-      /* Roboto es la fuente de la aplicacion. No se carga desde la red: la
-         mayoria de clientes bloquea las fuentes remotas, y este servicio corre
-         en una red que no siempre tiene salida a internet. Si el equipo la tiene
-         instalada se usa; si no, cae a la del sistema. */
-      body,
-      table,
-      td,
-      p,
-      h1 {
-        font-family: "Roboto", "Segoe UI", -apple-system, BlinkMacSystemFont,
-          "Helvetica Neue", Arial, sans-serif;
+      body, table, td, p, h1, span {
+        font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
       }
-
-      /* Gmail e Outlook clasico ignoran esta consulta; por eso el diseño en claro
-         tiene que sostenerse solo y el oscuro es una mejora, no un requisito. */
       @media (prefers-color-scheme: dark) {
-        .page { background-color: #050505 !important; }
-        .card {
-          background-color: #0a0a0b !important;
-          border-color: #232326 !important;
-        }
-        .card-head,
-        .card-foot { border-color: #232326 !important; }
-        .card-foot { background-color: #0f0f11 !important; }
-        .t-primary { color: #ffffff !important; }
+        .page { background-color: #0b0b0d !important; }
+        .t-primary { color: #fafafa !important; }
         .t-secondary { color: #d4d4d8 !important; }
         .t-muted { color: #a1a1aa !important; }
-        .t-subtle { color: #71717a !important; }
-        .code-box {
-          background-color: #0d2b31 !important;
-          border-color: #155e75 !important;
-        }
-        .code, .accent { color: #22d3ee !important; }
-        .pill {
-          background-color: #0d2b31 !important;
-          color: #22d3ee !important;
-        }
+        .code-box { background-color: #18181b !important; }
+        .code { color: #fafafa !important; }
+        .rule { border-color: #27272a !important; }
+        .dot, .bar { background-color: #22d3ee !important; }
+        .ok { color: #22d3ee !important; }
       }
-
       @media only screen and (max-width: 600px) {
         .pad-x { padding-left: 24px !important; padding-right: 24px !important; }
-        .code { font-size: 30px !important; letter-spacing: 6px !important; }
+        .code { font-size: 32px !important; letter-spacing: 8px !important; }
         .h1 { font-size: 24px !important; line-height: 32px !important; }
       }
     </style>
   </head>
 
-  <body class="page" style="margin:0;padding:0;background-color:#f8fafc;color:#0f172a;">
-    <!-- Texto de vista previa: es lo que se lee en la bandeja antes de abrir. -->
+  <body class="page" style="margin:0;padding:0;background-color:#ffffff;color:#111827;">
     <div style="display:none;max-height:0;overflow:hidden;opacity:0;">
-      Tu código de verificación de Rush. Caduca pronto y no debe compartirse.
+      Tu código de verificación es {{ .codeOtp }}. Caduca en {{ if .timeCode }}{{ .timeCode }}{{ else }}5 minutos{{ end }}.
     </div>
 
-    <table role="presentation" class="page" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc;">
+    <table role="presentation" class="page" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#ffffff;">
       <tr>
-        <td align="center" style="padding:40px 16px;">
-          <table role="presentation" class="card" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background-color:#ffffff;border:1px solid #e2e8f0;border-radius:20px;">
+        <td align="center" style="padding:40px 0 48px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:480px;">
 
-            <!-- Marca -->
+            <!-- Franja de marca: ancla el correo y lo hace reconocible de un vistazo -->
             <tr>
-              <td class="card-head pad-x" style="padding:26px 36px;border-bottom:1px solid #e2e8f0;">
-                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <td class="bar" style="height:4px;background-color:#0891b2;font-size:0;line-height:0;">&nbsp;</td>
+            </tr>
+            <tr><td style="height:32px;font-size:0;line-height:0;">&nbsp;</td></tr>
+
+            <!-- Marca: solo el nombre, sin caja -->
+            <tr>
+              <td class="pad-x" style="padding:0 32px 28px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
                   <tr>
-                    <!-- Punto cian: el unico color de marca de la plataforma. Va
-                         como cuadro con radio porque Outlook no dibuja circulos. -->
-                    <td style="width:10px;height:10px;background-color:#0891b2;border-radius:3px;font-size:0;line-height:0;">&nbsp;</td>
-                    <td class="t-primary" style="padding-left:10px;color:#0f172a;font-size:17px;font-weight:700;letter-spacing:-0.2px;">Rush</td>
+                    <td class="dot" style="width:9px;height:9px;background-color:#0891b2;border-radius:3px;font-size:0;line-height:0;">&nbsp;</td>
+                    <td class="t-primary" style="padding-left:9px;color:#111827;font-size:16px;font-weight:700;letter-spacing:-0.2px;">{{ if .brand }}{{ .brand }}{{ else }}Rush{{ end }}</td>
+                    <td align="right" class="t-muted" style="color:#0e7490;font-size:12px;font-weight:500;">&#128274;&nbsp;Verificación segura</td>
                   </tr>
                 </table>
               </td>
             </tr>
 
-            <!-- Cuerpo -->
             <tr>
-              <td class="pad-x" style="padding:36px 36px 8px;">
-                <p class="t-muted" style="margin:0 0 10px;color:#64748b;font-size:12px;line-height:18px;font-weight:600;letter-spacing:0.4px;">
-                  {{ if .eyebrow }}{{ .eyebrow }}{{ else }}VERIFICACIÓN DE CUENTA{{ end }}
-                </p>
-                <h1 class="h1 t-primary" style="margin:0;color:#0f172a;font-size:28px;line-height:36px;font-weight:700;letter-spacing:-0.5px;">
-                  {{ if .title }}{{ .title }}{{ else }}Confirma tu correo electrónico{{ end }}
+              <td class="pad-x" style="padding:0 32px;">
+                <h1 class="h1 t-primary" style="margin:0;color:#111827;font-size:26px;line-height:34px;font-weight:700;letter-spacing:-0.4px;">
+                  {{ if .title }}{{ .title }}{{ else }}Tu código de verificación{{ end }}
                 </h1>
-                <p class="t-secondary" style="margin:14px 0 0;color:#334155;font-size:15px;line-height:24px;">
-                  {{ if .intro }}{{ .intro }}{{ else }}Introduce este código en Rush para completar tu registro.{{ end }}
+                <p class="t-secondary" style="margin:12px 0 0;color:#4b5563;font-size:16px;line-height:25px;">
+                  {{ if .intro }}{{ .intro }}{{ else }}Usa este código para continuar. Es de un solo uso.{{ end }}
                 </p>
               </td>
             </tr>
 
             <!-- Codigo -->
             <tr>
-              <td class="pad-x" style="padding:24px 36px 0;">
-                <table role="presentation" class="code-box" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#ecfeff;border:1px solid #a5f3fc;border-radius:14px;">
+              <td class="pad-x" style="padding:28px 32px 0;">
+                <table role="presentation" class="code-box" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f3f4f6;border-radius:12px;">
                   <tr>
-                    <td align="center" style="padding:26px 12px;">
-                      <!-- El codigo en cian y no en negro: es lo unico que hay que
-                           hacer en todo el correo, asi que se lleva el acento. -->
-                      <p class="code accent" style="margin:0;color:#0891b2;font-size:36px;line-height:44px;font-weight:700;letter-spacing:10px;">{{ .codeOtp }}</p>
+                    <td align="center" style="padding:24px 12px;">
+                      <p class="code" style="margin:0;color:#111827;font-size:36px;line-height:44px;font-weight:700;letter-spacing:10px;">{{ .codeOtp }}</p>
                     </td>
                   </tr>
                 </table>
-              </td>
-            </tr>
-
-            <!-- Caducidad -->
-            <tr>
-              <td class="pad-x" style="padding:16px 36px 0;">
-                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
-                  <tr>
-                    <td class="pill" style="background-color:#ecfeff;border-radius:999px;padding:6px 12px;color:#0e7490;font-size:12px;line-height:16px;font-weight:600;">
-                      Caduca en {{ if .timeCode }}{{ .timeCode }}{{ else }}5 minutos{{ end }}
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-
-            <!-- Aviso -->
-            <tr>
-              <td class="pad-x" style="padding:22px 36px 34px;">
-                <p class="t-muted" style="margin:0;color:#64748b;font-size:13px;line-height:21px;">
-                  Nadie de Rush te va a pedir este código. Si no solicitaste la verificación, ignora este mensaje y tu cuenta seguirá igual.
+                <p class="t-muted" style="margin:14px 0 0;color:#6b7280;font-size:14px;line-height:22px;">
+                  Caduca en {{ if .timeCode }}{{ .timeCode }}{{ else }}5 minutos{{ end }}.
                 </p>
               </td>
             </tr>
 
-            <!-- Pie -->
             <tr>
-              <td class="card-foot pad-x" style="padding:18px 36px;background-color:#f8fafc;border-top:1px solid #e2e8f0;border-radius:0 0 20px 20px;">
-                <p class="t-subtle" style="margin:0;color:#94a3b8;font-size:11px;line-height:18px;">
-                  Mensaje automático. No respondas a este correo.
+              <td class="pad-x" style="padding:28px 32px 0;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td class="t-secondary" style="padding:0 0 10px;color:#374151;font-size:14px;line-height:22px;"><span class="ok" style="color:#0891b2;font-weight:700;">&#10003;</span>&nbsp;&nbsp;Código de un solo uso</td>
+                  </tr>
+                  <tr>
+                    <td class="t-secondary" style="padding:0 0 10px;color:#374151;font-size:14px;line-height:22px;"><span class="ok" style="color:#0891b2;font-weight:700;">&#10003;</span>&nbsp;&nbsp;Nunca te pediremos tu contraseña por correo</td>
+                  </tr>
+                  <tr>
+                    <td class="t-secondary" style="padding:0;color:#374151;font-size:14px;line-height:22px;"><span class="ok" style="color:#0891b2;font-weight:700;">&#10003;</span>&nbsp;&nbsp;No lo compartas con nadie, ni siquiera con nosotros</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td class="pad-x" style="padding:24px 32px 0;">
+                <p class="t-muted" style="margin:0;color:#6b7280;font-size:14px;line-height:22px;">
+                  ¿No fuiste tú? Ignora este mensaje: sin el código nadie puede entrar a tu cuenta. Si recibes varios sin pedirlos, te recomendamos cambiar tu contraseña.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td class="pad-x" style="padding:32px 32px 0;">
+                <div class="rule" style="border-top:1px solid #e5e7eb;font-size:0;line-height:0;">&nbsp;</div>
+                <p class="t-muted" style="margin:16px 0 0;color:#9ca3af;font-size:12px;line-height:18px;">
+                  Equipo de Seguridad · Mensaje automático, no respondas a este correo.
                 </p>
               </td>
             </tr>
           </table>
-
-          <p class="t-subtle" style="margin:18px 0 0;color:#94a3b8;font-size:11px;line-height:18px;text-align:center;">
-            Rush · Seguridad de la cuenta
-          </p>
         </td>
       </tr>
     </table>

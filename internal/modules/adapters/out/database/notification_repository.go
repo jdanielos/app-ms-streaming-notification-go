@@ -135,6 +135,21 @@ func (r *NotificationRepository) UnreadCount(ctx context.Context, userID string)
 	return count, err
 }
 
+// MarkAllRead pone `read_at` a las que siguen sin leer. Solo toca las del propio
+// usuario y solo las pendientes, asi que repetirla no cambia nada (idempotente).
+func (r *NotificationRepository) MarkAllRead(ctx context.Context, userID string, category string) (int64, error) {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE ecosystem_core_auth.notifications
+		SET read_at = NOW()
+		WHERE user_id = $1
+		  AND read_at IS NULL
+		  AND ($2 = '' OR category_code = $2)`, userID, category)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
 func NewNotificationRepository(pool *pgxpool.Pool) *NotificationRepository {
 	return &NotificationRepository{pool: pool}
 }

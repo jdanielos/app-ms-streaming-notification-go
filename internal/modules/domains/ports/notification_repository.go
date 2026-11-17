@@ -34,6 +34,9 @@ type NotificationRepositoryInterface interface {
 	// detras de un "cargar mas" que el usuario no sabe que tiene que pulsar.
 	ListInbox(ctx context.Context, userID string, limit int, cursor string, category string) (notification.InboxPage, error)
 	UnreadCount(ctx context.Context, userID string) (int, error)
+	// Marca como leidas las pendientes del usuario (de una categoria, o todas si
+	// `category` va vacio) y devuelve cuantas cambiaron.
+	MarkAllRead(ctx context.Context, userID string, category string) (int64, error)
 	// El catalogo activo con lo que este usuario tiene en cada categoria.
 	ListCategories(ctx context.Context, userID string) ([]notification.CategorySummary, error)
 }
